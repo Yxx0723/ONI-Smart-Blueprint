@@ -43,6 +43,21 @@ Dev MOD    ~/Library/Application Support/unity.Klei.Oxygen Not Included/mods/Dev
 4. **Assembly-CSharp 里有一个全局 `Action` 枚举**（`public Action HotKey = Action.NumActions;`），
    会遮蔽 `System.Action`。在 GameAdapter 里写委托参数必须写 `System.Action`，否则编译报
    `无法从"方法组"转换为"Action"` + `CS0149`。
+5. **系统代理是死的，但直连是通的**。shell 里 `HTTP_PROXY=127.0.0.1:1082` 指向一个未启动的代理，
+   导致 `curl`/`git` 默认全部失败。`curl --noproxy '*'` 与 `git` 绕过代理后访问 GitHub 正常。
+   本仓库已设 `local http.proxy=""` / `https.proxy=""` 固化这一点；若换机器或重装需重新设置。
+
+---
+
+## 2.1 远程仓库
+
+```
+origin  https://github.com/Yxx0723/ONI-Smart-Blueprint.git   (Apache-2.0)
+```
+
+- 凭证：macOS keychain（`credential.helper=osxkeychain`），HTTPS 推送无需 token。
+- 提交身份已设为 `Yxx0723 <103908637+Yxx0723@users.noreply.github.com>`。
+- 游戏专有 DLL、`bin/`、`obj/`、反编译产物均在 `.gitignore` 中，**不得提交**。
 
 ---
 

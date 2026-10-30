@@ -45,3 +45,14 @@ grep '\[OSB' "$HOME/Library/Logs/Klei/Oxygen Not Included/Player.log"
 | `docs/API-Audit.md` | 已核实的游戏 API 清单与风险 |
 | `docs/Game-Build-Matrix.md` | 版本、工具链、路径矩阵 |
 | `docs/Phase-Reports/` | 各阶段报告与上下文交接 |
+
+## 许可证
+
+[Apache License 2.0](LICENSE)。
+
+第三方边界：本项目**未**收录任何第三方 MOD 的代码。参考过的实现（如 Blueprints Expanded）
+其许可原文尚未核实，在核实前不得引入其代码或资源，详见 `AGENTS.md` 第 6 节。
+
+游戏本体（《缺氧》/ Oxygen Not Included）及其程序集版权归 Klei Entertainment 所有。
+本项目不包含、不分发任何游戏原始文件。
+
