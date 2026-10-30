@@ -4,9 +4,16 @@ using System.Collections.Generic;
 namespace OSB.Domain
 {
     /// <summary>
-    /// 建筑占位形状。ONI 的建筑是一个多格 footprint，不是单个中心点：
-    /// 已验证 BuildingDef 暴露 WidthInCells / HeightInCells / PlacementOffsets
-    /// （见 docs/API-Audit.md）。本类型只描述几何，不描述可建造性。
+    /// 矩形占位描述（宽 × 高 + 锚点偏移）。
+    ///
+    /// ⚠️ **P2-A 起，本类型不再用于蓝图占用判定，仅作声明尺寸的几何辅助。**
+    ///
+    /// 原因：ONI 的声明尺寸（`WidthInCells`/`HeightInCells`）只描述视觉，
+    /// 与真实占位可以不一致（`FlowerVaseHanging` 声明 1x2、实占 1x1）；
+    /// 且建筑占位未必是矩形。用矩形代替真实占用格会虚占格子。
+    ///
+    /// **真实占用一律用 <see cref="BuildingRecord.OccupiedCells()"/>**，
+    /// 它由原始 <see cref="BuildingRecord.PlacementOffsets"/> 逐个旋转求和得到。
     /// </summary>
     public readonly struct Footprint : IEquatable<Footprint>
     {

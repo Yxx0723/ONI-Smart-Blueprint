@@ -68,7 +68,7 @@ namespace OSB.Domain
         }
 
         /// <summary>批量变换格偏移，顺序保持不变。</summary>
-        public static Point2i[] RotateAll(IReadOnlyList<Point2i> offsets, BuildingOrientation orientation)
+        public static Point2i[] RotateAll(IList<Point2i> offsets, BuildingOrientation orientation)
         {
             if (offsets == null)
             {
