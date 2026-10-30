@@ -19,7 +19,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="OsbLog.cs" />
     <Compile Include="GameProbe.cs" />
+    <Compile Include="GameDatabaseReady.cs" />
+    <Compile Include="BuildingGeometryCollector.cs" />
+    <Compile Include="GridCoordinateVerifier.cs" />
+    <Compile Include="TechAccessor.cs" />
+    <Compile Include="MaterialAccessor.cs" />
   </ItemGroup>
 
   <ItemGroup>

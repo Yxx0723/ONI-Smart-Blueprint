@@ -24,6 +24,10 @@
     <Compile Include="Program.cs" />
     <Compile Include="GeometryTests.cs" />
     <Compile Include="BlueprintTests.cs" />
+    <Compile Include="OrientationTests.cs" />
+    <Compile Include="GridGeometryTests.cs" />
+    <Compile Include="GeometryTableTests.cs" />
+    <Compile Include="InitializerTests.cs" />
   </ItemGroup>
 
   <ItemGroup>

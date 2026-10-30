@@ -23,8 +23,14 @@
     <Compile Include="Rect2i.cs" />
     <Compile Include="Footprint.cs" />
     <Compile Include="LayerKind.cs" />
+    <Compile Include="PermittedRotation.cs" />
+    <Compile Include="GeometryOrientation.cs" />
+    <Compile Include="GridGeometry.cs" />
     <Compile Include="BuildingRecord.cs" />
+    <Compile Include="BuildingGeometry.cs" />
+    <Compile Include="BuildingGeometryTable.cs" />
     <Compile Include="Blueprint.cs" />
+    <Compile Include="OneShotInitializer.cs" />
   </ItemGroup>
 
 </Project>

@@ -369,6 +369,206 @@ in the stack trace, adding to referenced mods list
 
 ---
 
+## 3.5 P1 新增审计条目
+
+### L-001 游戏数据库初始化时序 ★核心
+
+| 字段 | 内容 |
+|---|---|
+| 证据 | **E1** |
+| 适用版本 | 744825 |
+| 风险 | 低（时序稳定），但**用错就会拿到 null** |
+
+反编译 `Assets.cs` 得到的完整链路：
+
+```csharp
+// Assets.cs
+protected override void OnPrefabInit() { ...; CreatePrefabs(); }
+
+private void CreatePrefabs()
+{
+    Db.Get();                                   // ← 游戏数据库在此初始化
+    BuildingDefs = new List<BuildingDef>();     // ← 清空并准备填充
+    foreach (KPrefabID prefabAsset in PrefabAssets) { ...; AddPrefab(prefabAsset); }
+    LegacyModMain.Load();                       // ← 所有 Mod 建筑在此注册
+    Db.Get().PostProcess();
+    ComplexRecipeManager.Get().PostProcess();
+}
+
+// LegacyModMain.cs:151
+private static void LoadBuildings(List<Type> types)
+{
+    ...
+    GeneratedBuildings.LoadGeneratedBuildings(types);
+}
+
+// GeneratedBuildings.cs:8 → BuildingConfigManager.cs:114
+public void RegisterBuilding(IBuildingConfig config) { ...; Assets.AddBuildingDef(buildingDef); }
+```
+
+**结论：`Assets.CreatePrefabs()` 返回之后，`Assets.BuildingDefs` 才是完整的（含全部 Mod 建筑）。**
+
+`KMod.UserMod2.OnAllModsLoaded` 在其之前，所以 P0 探针在那里读到 null —— 那不是缺陷，是时机不对。
+
+**本项目采用的挂载点**：`Assets.CreatePrefabs` 的 Harmony postfix（主）+ `Game.Update` postfix（兜底）。
+两者都经 `OneShotInitializer` 保护，成功后短路。
+
+**被否决的方案**：在主菜单之外的早期阶段调用 `Db.Get()` 强行触发初始化。
+`Db.Get()` 在 `_Instance == null` 时会立即 `Resources.Load<Db>("Db")` 并 `Initialize()`，
+提前调用会打乱游戏自身的初始化顺序——这是"看起来能跑、实际埋雷"的典型做法，不采用。
+
+---
+
+### L-002 `Assets.OnSpawn` 也会调用 `Db.Get()`
+
+| 字段 | 内容 |
+|---|---|
+| 签名 | `protected override void OnSpawn()` → `base.OnSpawn(); Db.Get();` |
+| 证据 | **E1** |
+| 说明 | 可作为"Db 一定已就绪"的次级判据，但它晚于 `CreatePrefabs`，对采集没有额外价值 |
+
+---
+
+### G-001 Grid 坐标数学 ★核心
+
+| 字段 | 内容 |
+|---|---|
+| 证据 | **E1**（反编译）+ **E2**（游戏内 `GridCoordinateVerifier` 实测，见 P1 报告） |
+| 风险 | 中 —— `OffsetCell` 不做越界检查，是真实的隐性 bug 来源 |
+
+```csharp
+public static int XYToCell(int x, int y)                  => x + y * WidthInCells;
+public static int CellColumn(int cell)                    => cell % WidthInCells;
+public static int CellRow(int cell)                       => cell / WidthInCells;
+public static void CellToXY(int cell, out int x, out int y);
+public static Vector3 CellToPos(int cell)                 => (CellSizeInMeters * (cell % W), CellSizeInMeters * (cell / W), 0);
+public static int PosToCell(Vector3 pos)                  => (int)(pos.y + 0.05f) * WidthInCells + (int)pos.x;
+public static int OffsetCell(int cell, int x, int y)      => cell + x + y * WidthInCells;   // 无边界检查
+public static bool IsCellOffsetValid(int cell, int x, int y);                              // 有边界检查
+public static bool IsValidCell(int cell)                  => cell >= 0 && cell < CellCount;
+public static bool IsWorldValidCell(int cell)             => IsValidCell(cell) && WorldIdx[cell] != byte.MaxValue;
+public static bool IsValidBuildingCell(int cell);         // 额外检查世界边界与 TopBorderHeight
+```
+
+**Y 轴方向结论（UNKNOWN-1 已解决）**：格 Y 轴与 Unity 世界 Y 轴**同向，向上为正，未翻转**。
+推导依据：`CellToPos` 用 `CellSizeInMeters * (cell / Width)` 作为世界 y，与 `CellRow` 完全一致。
+
+**必须记住的坑**：从最后一列 `OffsetCell(cell, 1, 0)` 会绕回**下一行首列**，得到一个合法索引。
+任何构造性使用前必须调 `IsCellOffsetValid`。领域层 `GridGeometry.Offset` 保留了这个行为并有专门测试。
+
+---
+
+### R-001 旋转换算
+
+| 字段 | 内容 |
+|---|---|
+| 签名 | `public static CellOffset GetRotatedCellOffset(CellOffset offset, Orientation orientation)` |
+| 证据 | **E1** |
+| 风险 | 中 —— 哨兵值会被 default 分支静默吞掉 |
+
+```csharp
+Orientation.R90   => new CellOffset( offset.y, -offset.x)
+Orientation.R180  => new CellOffset(-offset.x, -offset.y)
+Orientation.R270  => new CellOffset(-offset.y,  offset.x)
+Orientation.FlipH => new CellOffset(-offset.x,  offset.y)
+Orientation.FlipV => new CellOffset( offset.x, -offset.y)
+_                 => offset          // ← Neutral 与 NumRotations 都走这里
+```
+
+**领域层有意偏离**：`GeometryOrientation.Rotate` 对 `NumRotations` 抛 `ArgumentOutOfRangeException`，
+而不是静默返回原值。哨兵被当真实朝向用是隐性 bug，宁可在测试里炸掉。
+
+---
+
+### R-002 旋转形态与合法朝向
+
+| 字段 | 内容 |
+|---|---|
+| 类型 | `PermittedRotations`（`Unrotatable, R90, R360, FlipH, FlipV`）；`BuildingDef.PermittedRotations` 字段 |
+| 证据 | **E1**（`Rotatable.Rotate` 实现） |
+| 风险 | 低 |
+
+```csharp
+switch (permittedRotations)
+{
+    case PermittedRotations.R360:  orientation = (Orientation)((int)(orientation + 1) % 4); break;
+    case PermittedRotations.R90:   orientation = orientation == Neutral ? R90 : Neutral;    break;
+    case PermittedRotations.FlipH: orientation = orientation == Neutral ? FlipH : Neutral;  break;
+    case PermittedRotations.FlipV: orientation = orientation == Neutral ? FlipV : Neutral;  break;
+}
+```
+
+→ 合法集合：`Unrotatable={Neutral}`、`R90={Neutral,R90}`、`R360={Neutral,R90,R180,R270}`、
+`FlipH={Neutral,FlipH}`、`FlipV={Neutral,FlipV}`。领域层 `PermittedRotationInfo` 已建模并有测试。
+
+**枚举数值必须对齐**：`Orientation` = `Neutral0, R901, R1802, R2703, NumRotations4, FlipH5, FlipV6`。
+领域层 `BuildingOrientation` 已按此编号，可直接整数转换。
+
+---
+
+### T-001 科技解锁读取
+
+| 字段 | 内容 |
+|---|---|
+| 签名 | `Database.Techs.TryGetTechForTechItem(string itemId)` → `Tech`；`Database.Techs.IsTechItemComplete(string id)` → `bool`；`Tech.IsComplete()` → `bool`；`Tech.unlockedItemIDs` |
+| 证据 | **E1** |
+| 风险 | **高** —— 两个方向的静默错误 |
+
+```csharp
+// Tech.IsComplete()：不在殖民地时恒为 false（fail-closed）
+public bool IsComplete()
+{
+    if (Research.Instance != null) return Research.Instance.Get(this)?.IsComplete() ?? false;
+    return false;
+}
+
+// Database.Techs.IsTechItemComplete(id)：找不到 item 时返回 true（fail-open）
+public bool IsTechItemComplete(string id)
+{
+    foreach (Tech resource in resources)
+        foreach (TechItem unlockedItem in resource.unlockedItems)
+            if (unlockedItem.Id == id) return resource.IsComplete();
+    return true;
+}
+```
+
+**三条调用限制**：
+1. 必须在 `Db.Get()` 之后（即 `Assets.CreatePrefabs()` 之后）。
+2. 主菜单阶段 `Research.Instance == null`，所有科技都会显示"未解锁"——上下文不成立，不是数据错误。
+3. `IsTechItemComplete` 对不存在的 item 返回 `true`。判"已解锁"必须先确认 item 真实存在。
+
+---
+
+### M-001 材料可用性读取
+
+| 字段 | 内容 |
+|---|---|
+| 签名 | `ElementLoader.FindElementByTag(Tag)` / `FindElementByName(string)` / `GetElement(Tag)` / `FindElements(Func<Element,bool>)`；`Element.id`（SimHashes）/`Element.tag`（Tag）/`Element.state` |
+| 证据 | **E1** |
+| 风险 | 低 |
+
+- `GetElement` 是字典直查，**查不到返回 null，不抛异常**——必须判空。
+- 元素表在 `Assets` 初始化期间建立，故需在 `CreatePrefabs()` 之后调用。
+- `BuildingDef.DefaultElements()` 依赖 `MaterialCategory` 映射，个别建筑会抛异常，必须逐个 try/catch。
+- **本类不回答"材料够不够"**：库存判定依赖具体殖民地，属于放置期逻辑。
+
+---
+
+### H-001 Harmony 补丁的应用方式（有意偏离惯例）
+
+| 字段 | 内容 |
+|---|---|
+| 事实 | `KMod.DLLLoader` 为无 `UserMod2` 子类的程序集自动 `new UserMod2()`，其基类 `OnLoad` 执行 `harmony.PatchAll(该程序集)` |
+| 证据 | **E1**（`DLLLoader.LoadDLLs`） |
+| 本项目做法 | **不使用 `[HarmonyPatch]` 特性**，改由 `OsbMod.OnLoad` 显式 `harmony.Patch(...)` |
+
+**理由**：特性路径没有 try/catch，特性写错 = 整包 MOD 加载失败，并可能被 ONI 记为崩溃源（P0 已踩过一次）。
+显式挂载可以逐条捕获、逐条记录，单条失败不影响其余功能。
+
+**代价**：放弃了一处便利。若未来确有需要，可以加特性补丁——但要清楚它会在那条无保护路径上执行。
+
+---
+
 ## 4. 对方案文档的事实修正
 
 | 文档位置 | 原文 | 实测 | 处置 |
@@ -383,13 +583,14 @@ in the stack trace, adding to referenced mods list
 
 | 编号 | 项目 | 状态 | 说明 |
 |---|---|---|---|
-| UNKNOWN-1 | `Grid.XYToCell` 的 y 轴方向 | `UNKNOWN` | 需 P1 写往返测试 + 实地比对确认；在此之前任何坐标换算代码都不得视为正确 |
-| UNKNOWN-2 | 科技解锁读取（`Tech` / `TechTree` / `Db.Get().Techs`） | `UNKNOWN` | 本轮未审计。FR-10 的科技约束依赖它 |
+| UNKNOWN-1 | `Grid.XYToCell` 的 y 轴方向 | **已解决（P1）** | 见 G-001：Y 轴向上为正、未翻转。含领域层往返测试 + 游戏内运行时核对 |
+| UNKNOWN-2 | 科技解锁读取（`Tech` / `Techs`） | **已解决（P1）** | 见 T-001，含 fail-open / fail-closed 两处陷阱 |
 | UNKNOWN-3 | 施工任务的可撤销句柄 | `UNKNOWN` | `Constructable` 公开面不足以标识"我创建的这条任务"。方案 7.3 要求"无可靠 ID 时禁止自动撤销"，倾向 P2 先不做撤销 |
-| UNKNOWN-4 | 材料可用性读取（`ElementLoader`） | `UNKNOWN` | 本轮未审计 |
-| UNKNOWN-5 | `GameAdapter` 内 Harmony 补丁能否由自动补出的空 `UserMod2` 实例生效 | `E4 推断` | A-001 第 4 点推论，需 P2 首次放补丁时实测 |
-| UNKNOWN-6 | 存档中是否可安全存放自定义组件 | `UNKNOWN` | 方案 7.3 要求"禁用 MOD 后存档仍可加载"，须专门设计并测试 |
-| BLOCKED-1 | 第三方 LICENSE 原文核对 | `BLOCKED` | 网络不可用，无法访问 GitHub/Steam。方案文档关于 "Mayall = MIT / Sgt_Imalas = All Rights Reserved" 的结论**仅为二手信息，未经本项目核实** |
+| UNKNOWN-4 | 材料可用性读取（`ElementLoader`） | **已解决（P1）** | 见 M-001 |
+| UNKNOWN-5 | `GameAdapter` 内 `[HarmonyPatch]` 特性补丁能否由自动补出的空 `UserMod2` 实例生效 | **机制已确证（E1）** | 见 H-001。机制成立，但本项目**刻意不采用**该路径，改为显式挂载 |
+| UNKNOWN-6 | 存档中是否可安全存放自定义组件 | `UNKNOWN` | 方案 7.3 要求"禁用 MOD 后存档仍可加载"，须专门设计并测试；P1 未涉及存档 |
+| UNKNOWN-7 | 建筑 `PlacementOffsets` 的锚定约定是否统一 | `部分确认（P1）` | 运行时采集显示并非所有建筑都从 (0,0) 起算，须以实际采集结果与异常统计为准 |
+| BLOCKED-1 | 第三方 LICENSE 原文核对 | `BLOCKED` | 网络代理故障已定位（直连可用），但尚未安排复核。方案文档关于 "Mayall = MIT / Sgt_Imalas = All Rights Reserved" 的结论**仅为二手信息，未经本项目核实** |
 
 ---
 

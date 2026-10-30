@@ -17,9 +17,16 @@ namespace OSB.Domain
     }
 
     /// <summary>
-    /// 建筑朝向。取值集合与已核实的 ONI <c>Orientation</c> 枚举一致
-    /// （Neutral / R90 / R180 / R270 / FlipH / FlipV），但本枚举属于领域层，
-    /// 不直接引用游戏类型。
+    /// 建筑朝向。
+    ///
+    /// **数值必须与 ONI 的 <c>Orientation</c> 枚举逐一对应**（已反编译核实）：
+    /// <c>Neutral=0, R90=1, R180=2, R270=3, NumRotations=4, FlipH=5, FlipV=6</c>。
+    /// 这样适配层可以直接整数转换，避免映射表出错。
+    ///
+    /// <see cref="NumRotations"/> 不是可用朝向，而是"旋转形态数量"的哨兵值：
+    /// 游戏 <c>Rotatable.GetRotatedCellOffset</c> 的 default 分支会把它当恒等变换静默处理，
+    /// 这是最容易埋雷的地方。本领域层把它建模出来，并让 <see cref="GeometryOrientation"/>
+    /// 在收到该值时**抛异常而不是静默放行**。
     /// </summary>
     public enum BuildingOrientation
     {
@@ -27,8 +34,22 @@ namespace OSB.Domain
         R90 = 1,
         R180 = 2,
         R270 = 3,
-        FlipH = 4,
-        FlipV = 5
+        NumRotations = 4,
+        FlipH = 5,
+        FlipV = 6
+    }
+
+    /// <summary>
+    /// 建筑可用的旋转形态。与 ONI 的 <c>PermittedRotations</c> 枚举逐一对应（已反编译核实）。
+    /// 注意它与 <see cref="BuildingOrientation"/> 不是一回事：前者是"能怎么转"，后者是"当前转到了哪"。
+    /// </summary>
+    public enum PermittedRotation
+    {
+        Unrotatable = 0,
+        R90 = 1,
+        R360 = 2,
+        FlipH = 3,
+        FlipV = 4
     }
 
     /// <summary>校验问题级别。Blocker 阻止放置，Warning 允许但需提示，Info 仅建议。</summary>

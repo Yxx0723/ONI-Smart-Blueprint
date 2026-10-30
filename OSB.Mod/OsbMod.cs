@@ -32,6 +32,19 @@ namespace OSB.Mod
         {
             base.OnLoad(harmony);
             Debug.Log(Prefix + "OnLoad, assembly=" + typeof(OsbMod).Assembly.GetName().Name);
+
+            // P1：显式挂载数据管线补丁。
+            // 刻意不用 [HarmonyPatch] 特性 —— 那条路径由加载器补出的空 UserMod2 实例执行
+            // PatchAll，没有 try/catch，特性写错就是整包 MOD 加载失败。
+            try
+            {
+                GameDatabaseReady.ApplyPatches(harmony);
+            }
+            catch (System.Exception e)
+            {
+                // 补丁挂载失败不允许影响 MOD 加载
+                Debug.LogWarning(Prefix + "ApplyPatches 异常：" + e);
+            }
         }
 
         public override void OnAllModsLoaded(Harmony harmony, IReadOnlyList<KMod.Mod> mods)
