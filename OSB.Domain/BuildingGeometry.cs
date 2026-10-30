@@ -85,6 +85,77 @@ namespace OSB.Domain
 
         public int CellCount => Width > 0 && Height > 0 ? Width * Height : 0;
 
+        /// <summary>
+        /// Neutral 朝向下，占位偏移的包围盒（相对锚点格）。
+        ///
+        /// **ONI 的建筑不是以左下角为锚点**：<c>BuildingDef.GenerateOffsets</c> 使用
+        /// <c>x = j + (width/2 - width + 1)</c>、<c>y = i</c>，即**水平居中、底部对齐**。
+        /// 所以宽度 ≥3 的建筑会出现负的 x 偏移（例如 3 宽建筑 x ∈ [-1,1]）。
+        /// 因此本包围盒的 Min 通常不是 (0,0)。
+        /// </summary>
+        public Rect2i NeutralBounds
+        {
+            get
+            {
+                if (_placementOffsets.Length == 0)
+                {
+                    return Rect2i.Empty;
+                }
+
+                int minX = int.MaxValue;
+                int minY = int.MaxValue;
+                int maxX = int.MinValue;
+                int maxY = int.MinValue;
+
+                for (int i = 0; i < _placementOffsets.Length; i++)
+                {
+                    Point2i p = _placementOffsets[i];
+                    if (p.X < minX) minX = p.X;
+                    if (p.Y < minY) minY = p.Y;
+                    if (p.X > maxX) maxX = p.X;
+                    if (p.Y > maxY) maxY = p.Y;
+                }
+
+                return Rect2i.FromMinMax(minX, minY, maxX, maxY);
+            }
+        }
+
+        /// <summary>
+        /// 实际占位尺寸（由 <see cref="PlacementOffsets"/> 的包围盒得出）。
+        ///
+        /// **这是权威值**。<c>WidthInCells</c> / <c>HeightInCells</c> 只描述动画与视觉尺寸，
+        /// 游戏允许两者不一致：`FlowerVaseHangingConfig` 就声明 1x2 却调用
+        /// <c>GenerateOffsets(1, 1)</c> 只占 1 格（吊兰视觉高 2 格、实际只占天花板那一格）。
+        /// 任何需要"占几格"的代码都必须用本属性，不要用 <see cref="Width"/>/<see cref="Height"/>。
+        /// </summary>
+        public Point2i ActualSize
+        {
+            get
+            {
+                Rect2i bounds = NeutralBounds;
+                return bounds.IsEmpty ? Point2i.Zero : new Point2i(bounds.Width, bounds.Height);
+            }
+        }
+
+        /// <summary>声明尺寸与实际占位是否一致。不一致不一定是错误，见 <see cref="ActualSize"/>。</summary>
+        public bool SizeMatchesDeclaration =>
+            ActualSize.X == Width && ActualSize.Y == Height;
+
+        /// <summary>
+        /// 锚点格在 W×H 占位矩形里的位置（相对矩形左下角）。
+        /// 3 宽建筑为 (1,0)，4 宽建筑为 (1,0)，1 宽建筑为 (0,0)。
+        ///
+        /// 蓝图落位时必须用这个值把"锚点格"换算成"矩形左下角"，否则整体会错位。
+        /// </summary>
+        public Point2i AnchorInFootprint
+        {
+            get
+            {
+                Rect2i bounds = NeutralBounds;
+                return bounds.IsEmpty ? Point2i.Zero : new Point2i(-bounds.MinX, -bounds.MinY);
+            }
+        }
+
         /// <summary>指定朝向下的占位偏移。</summary>
         public IReadOnlyList<Point2i> OffsetsFor(BuildingOrientation orientation)
         {
@@ -158,15 +229,23 @@ namespace OSB.Domain
                 yield return new GeometryAnomaly(
                     "GEO002",
                     PrefabId,
-                    "占位格数 " + _placementOffsets.Length + " 与 宽×高 " + CellCount + " 不一致");
+                    "占位格数 " + _placementOffsets.Length + " 与声明宽×高 " + CellCount
+                    + " 不一致（占位以 PlacementOffsets 为准，声明尺寸仅描述视觉）");
             }
 
-            if (!GeometryOrientation.FitsInSize(_placementOffsets, BuildingOrientation.Neutral, Width, Height))
+            // 判据用**包围盒尺寸**而非"偏移是否从 (0,0) 起算"。
+            // ONI 的建筑水平居中锚定（见 NeutralBounds 注释），宽度 ≥3 时偏移含负值属正常，
+            // 若按"必须从原点开始"判定会产生大量误报（P1 实测：424 个建筑里误报 149 个）。
+            Rect2i bounds = NeutralBounds;
+            if (bounds.Width != Width || bounds.Height != Height)
             {
                 yield return new GeometryAnomaly(
                     "GEO003",
                     PrefabId,
-                    "Neutral 朝向占位超出声明尺寸 " + Width + "x" + Height);
+                    "实际占位 " + bounds.Width + "x" + bounds.Height
+                    + " 与声明尺寸 " + Width + "x" + Height + " 不同"
+                    + "（居中锚定原点 " + bounds.MinX + "," + bounds.MinY
+                    + "；游戏允许二者不一致，例如吊兰声明 1x2 实际占 1x1）");
             }
 
             // 旋转 90°/270° 后，占位包围盒应为 H×W（长宽互换）。

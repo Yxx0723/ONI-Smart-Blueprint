@@ -71,8 +71,12 @@ namespace OSB.GameAdapter
         }
 
         /// <summary>
-        /// 统计已采集建筑的材料覆盖情况：有多少建筑的默认材料在元素表里查不到。
-        /// 这是"蓝图能否落地"的前置健康度指标。
+        /// 统计已采集建筑的默认材料构成。
+        ///
+        /// **注意语义**：`DefaultMaterialTags` 里既有真正的元素（SandStone、Copper），
+        /// 也有制成品/虚拟材料（BasicFabric、PlasticGasket、RefinedMetal）。
+        /// 后者查 `ElementLoader` 必然返回 null，那是**正常**的，不是数据错误。
+        /// P1 实测：424 个建筑里有 19 个的主材料属于这一类。
         /// </summary>
         private static void ReportMaterialCoverage()
         {
@@ -84,8 +88,9 @@ namespace OSB.GameAdapter
             }
 
             int buildingsWithMaterials = 0;
-            int missing = 0;
-            var missingSamples = new List<string>();
+            int elementBacked = 0;
+            int fabricated = 0;
+            var fabricatedSamples = new List<string>();
 
             foreach (BuildingGeometry geometry in table.All)
             {
@@ -97,35 +102,38 @@ namespace OSB.GameAdapter
 
                 buildingsWithMaterials++;
 
-                foreach (string tagName in tags)
+                try
                 {
-                    try
+                    if (ElementLoader.GetElement(new Tag(tags[0])) != null)
                     {
-                        if (ElementLoader.GetElement(new Tag(tagName)) == null)
+                        elementBacked++;
+                    }
+                    else
+                    {
+                        fabricated++;
+                        if (fabricatedSamples.Count < 10)
                         {
-                            missing++;
-                            if (missingSamples.Count < 10)
-                            {
-                                missingSamples.Add(geometry.PrefabId + ":" + tagName);
-                            }
-
-                            break;
+                            fabricatedSamples.Add(geometry.PrefabId + ":" + tags[0]);
                         }
                     }
-                    catch (Exception)
+                }
+                catch (Exception)
+                {
+                    fabricated++;
+                    if (fabricatedSamples.Count < 10)
                     {
-                        missing++;
-                        break;
+                        fabricatedSamples.Add(geometry.PrefabId + ":" + tags[0]);
                     }
                 }
             }
 
-            OsbLog.Info("材料覆盖：有默认材料的建筑=" + buildingsWithMaterials
-                + "，其中含无法解析材料的=" + missing);
+            OsbLog.Info("材料构成：有默认材料的建筑=" + buildingsWithMaterials
+                + "，主材料为元素=" + elementBacked
+                + "，主材料为制成品/虚拟材料=" + fabricated + "（后者查元素表为 null 属正常）");
 
-            if (missingSamples.Count > 0)
+            if (fabricatedSamples.Count > 0)
             {
-                OsbLog.Info("无法解析材料样本：" + string.Join(", ", missingSamples.ToArray()));
+                OsbLog.Info("制成品材料样本：" + string.Join(", ", fabricatedSamples.ToArray()));
             }
         }
     }

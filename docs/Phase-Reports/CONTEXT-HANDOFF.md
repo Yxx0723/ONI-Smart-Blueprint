@@ -1,21 +1,26 @@
 # CONTEXT-HANDOFF.md —— 上下文交接
 
 > 每轮开工先读本文件。它记录"上一轮真实做到哪一步、哪些是已证实的、哪些只是假设"。
-> 最后更新：2026-10-30（P0 完成，状态 **PASS**）
+> 最后更新：2026-10-30（P1 完成，状态 **PASS**）
 
 ---
 
 ## 1. 三十秒摘要
 
-- 项目已从零建立到**可编译、可部署、在真实游戏内加载成功**的状态，位于 `~/ONI-Smart-Blueprint/`（独立 git 仓库）。
+- 项目已推进到 **P1**：在真实游戏内采集到 **424 个建筑的完整几何**，Grid 坐标规则 **16/16 项核实通过**。
 - 环境全部实测：ONI **744825**、Unity **6000.3.5f2**、Harmony **2.4.2.0**、SDK **10.0.301**、TFM `netstandard2.1`。
-- **三程序集部署形态已成立**：三个 DLL 同时加载，无冲突，探针 11/11 签名核对通过。
-- 三个最关键的技术判断都有证据：
+- **三程序集部署形态成立**，补丁显式挂载（非特性路径）已在游戏内生效。
+- 五条最关键的技术结论：
   1. 多 DLL 部署合法（每程序集最多一个 `UserMod2` 子类）；
   2. "只下施工计划"用 `BuildingDef.TryPlace`，不是 `Build`；
-  3. 建筑是多格 footprint（`WidthInCells` × `HeightInCells` + `PlacementOffsets`）。
-- **踩过一个会造成实际损失的坑**：MOD 加载期用 `Debug.LogError` 会让 ONI 把该 MOD 登记为疑似崩溃源，
-  进而触发安全模式禁用全部 MOD。已写成项目级硬规则（`AGENTS.md` 第 4 节）。
+  3. 采集时机必须挂在 `Assets.CreatePrefabs` 之后（`OnAllModsLoaded` 时数据库还没建）；
+  4. **建筑水平居中锚定**：宽度 ≥3 时 `PlacementOffsets` 的 x 为负，落位必须用 `AnchorInFootprint`；
+  5. **`WidthInCells`/`HeightInCells` 只描述视觉**，实际占位以 `PlacementOffsets` 为准
+     （吊兰声明 1x2 实际占 1x1）。
+- **踩过两个会造成实际损失的坑**：
+  1. MOD 加载期用 `Debug.LogError` 会让 ONI 把该 MOD 登记为疑似崩溃源，触发安全模式禁用全部 MOD；
+  2. 用"偏移必须从 (0,0) 起算"判占位合法性 → 424 个建筑里误报 149 个。
+  两条都已写成项目级硬规则（`AGENTS.md` 第 4 节与 `docs/API-Audit.md`）。
 
 ---
 

@@ -166,6 +166,85 @@ namespace OSB.Domain.Tests
             Check.True(HasCode(g.Validate(), "GEO002"), "占位格数与宽×高不符应触发 GEO002");
         }
 
+        internal static void CenteredAnchoringIsAccepted()
+        {
+            // ONI 的建筑水平居中锚定：3 宽建筑 x ∈ [-1,1]，y ∈ [0,2]
+            // 反编译依据：BuildingDef.GenerateOffsets 的 num = width/2 - width + 1
+            var centered3 = new List<Point2i>();
+            for (int y = 0; y < 3; y++)
+            {
+                for (int x = -1; x <= 1; x++)
+                {
+                    centered3.Add(new Point2i(x, y));
+                }
+            }
+
+            BuildingGeometry g3 = Geo("AdvancedApothecary", 3, 3, centered3.ToArray());
+            Check.Equal(0, g3.Validate().Count(), "3 宽居中锚定的建筑不应被判为异常");
+            Check.Equal(new Rect2i(-1, 0, 3, 3), g3.NeutralBounds, "Neutral 包围盒应为 (-1,0) 起 3x3");
+            Check.Equal(new Point2i(1, 0), g3.AnchorInFootprint, "锚点在占位矩形内偏移 (1,0)");
+
+            // 4 宽：num = 2-4+1 = -1，x ∈ [-1,2]
+            var centered4 = new List<Point2i>();
+            for (int y = 0; y < 4; y++)
+            {
+                for (int x = -1; x <= 2; x++)
+                {
+                    centered4.Add(new Point2i(x, y));
+                }
+            }
+
+            BuildingGeometry g4 = Geo("ArtifactAnalysisStation", 4, 4, centered4.ToArray());
+            Check.Equal(0, g4.Validate().Count(), "4 宽居中锚定的建筑不应被判为异常");
+            Check.Equal(new Point2i(1, 0), g4.AnchorInFootprint, "4 宽锚点同样偏移 (1,0)");
+
+            // 2 宽：num = 1-2+1 = 0，x ∈ [0,1]，锚点不偏移
+            BuildingGeometry g2 = Geo("ManualGenerator", 2, 2, Rect(2, 2));
+            Check.Equal(new Point2i(0, 0), g2.AnchorInFootprint, "2 宽建筑锚点不偏移");
+            Check.Equal(new Rect2i(0, 0, 2, 2), g2.NeutralBounds, "2 宽建筑包围盒从原点起");
+        }
+
+        internal static void AnchorMatchesGenerateOffsetsFormula()
+        {
+            // 逐宽度验证 AnchorInFootprint.X == -(width/2 - width + 1)
+            for (int width = 1; width <= 8; width++)
+            {
+                int expectedAnchorX = -(width / 2 - width + 1);
+                var offsets = new Point2i[width * 2];
+                int index = 0;
+                for (int y = 0; y < 2; y++)
+                {
+                    for (int j = 0; j < width; j++)
+                    {
+                        offsets[index++] = new Point2i(j + (width / 2 - width + 1), y);
+                    }
+                }
+
+                BuildingGeometry g = Geo("W" + width, width, 2, offsets);
+                Check.Equal(expectedAnchorX, g.AnchorInFootprint.X, "宽度 " + width + " 的锚点 X 偏移");
+                Check.Equal(0, g.AnchorInFootprint.Y, "宽度 " + width + " 的锚点 Y 偏移恒为 0（底部对齐）");
+                Check.Equal(0, g.Validate().Count(), "宽度 " + width + " 生成的合法占位不应报异常");
+            }
+        }
+
+        internal static void DeclaredSizeMayDifferFromActual()
+        {
+            // 真实案例：FlowerVaseHanging 声明 1x2 却 GenerateOffsets(1,1)，实际只占 1 格
+            BuildingGeometry hanging = Geo("FlowerVaseHanging", 1, 2, new[] { new Point2i(0, 0) });
+
+            Check.Equal(new Point2i(1, 1), hanging.ActualSize, "实际占位应为 1x1");
+            Check.False(hanging.SizeMatchesDeclaration, "声明 1x2 与实际 1x1 应判定为不一致");
+
+            // 不一致要如实报告，但不是"程序错误"——这是游戏允许的设计
+            bool reported = HasCode(hanging.Validate(), "GEO002");
+            Check.True(reported, "声明与实际不符应如实上报 GEO002 供数据审查");
+
+            // 常规建筑：一致
+            BuildingGeometry normal = Geo("ManualGenerator", 2, 2, Rect(2, 2));
+            Check.True(normal.SizeMatchesDeclaration, "2x2 常规建筑声明与实际一致");
+            Check.Equal(new Point2i(2, 2), normal.ActualSize, "2x2 实际占位");
+        }
+
         internal static void AnomalyOutOfDeclaredSize()
         {
             // 声明 1x1，却有一条偏移跑到 (3,0)

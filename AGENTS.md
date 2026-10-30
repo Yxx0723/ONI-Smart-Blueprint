@@ -25,6 +25,19 @@
 5. 所有数据格式必须版本化，并提供读写、异常输入与迁移测试。
 6. 每个改动按最小功能切片推进：先测试，后实现，再构建、回归、报告。
 
+## 2.1 建筑占位（P1 实测确立，违反会导致落位错位）
+
+1. **建筑是水平居中、底部对齐锚定的**。`BuildingDef.GenerateOffsets` 用
+   `x = j + (width/2 - width + 1)`、`y = i`，所以宽度 ≥3 的建筑 `PlacementOffsets` 的 x 为**负值**。
+   落位时必须用 `BuildingGeometry.AnchorInFootprint` 把锚点格换算成矩形左下角，否则整体偏一格。
+2. **占位以 `PlacementOffsets` 为权威**，`WidthInCells` / `HeightInCells` 只描述视觉尺寸，
+   二者可以不一致（`FlowerVaseHanging` 声明 1x2、实际占 1x1）。需要"占几格"时用 `ActualSize`。
+3. **不要用"偏移是否落在 [0,W)×[0,H) 内"判断占位合法性**。旋转后偏移必然含负值；
+   Neutral 下多数建筑也含负值。正确判据是**包围盒尺寸**是否等于声明尺寸。
+4. 朝向合法性一律走 `PermittedRotationInfo`，**永远不要把 `BuildingOrientation.NumRotations` 当真实朝向使用**。
+5. `Grid.OffsetCell` **不做边界检查**，最后一列 +1 会绕到下一行首列。
+   任何构造性使用前必须调 `Grid.IsCellOffsetValid`（领域层对应 `GridGeometry.IsOffsetInBounds`）。
+
 ## 3. 部署与程序集规则（已实证，见 docs/API-Audit.md A-001）
 
 1. ONI 加载器会 `Assembly.LoadFrom` MOD 目录下**每一个** `.dll`。

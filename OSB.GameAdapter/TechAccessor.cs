@@ -45,23 +45,21 @@ namespace OSB.GameAdapter
 
                 OsbLog.Info("科技总数=" + techs.Count);
 
-                // 样本：确认"查所属科技"与"查是否解锁"两条路径都能走通
-                string[] samples = { "Tile", "Door", "ManualGenerator", "Ladder", "Battery" };
-                foreach (string itemId in samples)
-                {
-                    try
-                    {
-                        Tech tech = techs.TryGetTechForTechItem(itemId);
-                        bool complete = techs.IsTechItemComplete(itemId);
+                // 样本分两类，覆盖"受科技约束"与"开局即解锁"两种情况。
+                // 已反编译核实：Techs.Init() 注册的 item ID 就是建筑 PrefabID
+                // （例如 FarmingTech 的列表里有 RationBox、MedicineIV 里有 AdvancedApothecary）。
+                // 因此查不到所属科技只说明该建筑无科技门槛，不是接口失效。
+                string[] gated = { "RationBox", "AdvancedApothecary", "Electrolyzer", "GasConduit", "FarmTile" };
+                string[] ungated = { "Tile", "Door", "ManualGenerator", "Ladder", "Battery" };
 
-                        OsbLog.Info("科技样本 " + itemId
-                            + " → tech=" + (tech == null ? "<未归属任何科技>" : tech.Id)
-                            + " IsComplete=" + complete);
-                    }
-                    catch (Exception e)
-                    {
-                        OsbLog.Warn("科技样本 " + itemId + " 查询失败：" + e.GetType().Name + ": " + e.Message);
-                    }
+                foreach (string itemId in gated)
+                {
+                    ReportItem(techs, itemId, expectGated: true);
+                }
+
+                foreach (string itemId in ungated)
+                {
+                    ReportItem(techs, itemId, expectGated: false);
                 }
 
                 // 反例：不存在的 item，用于印证 fail-open 行为
@@ -79,6 +77,31 @@ namespace OSB.GameAdapter
             catch (Exception e)
             {
                 OsbLog.Warn("科技审计失败：" + e.GetType().Name + ": " + e.Message);
+            }
+        }
+
+        private static void ReportItem(Database.Techs techs, string itemId, bool expectGated)
+        {
+            try
+            {
+                Tech tech = techs.TryGetTechForTechItem(itemId);
+                bool complete = techs.IsTechItemComplete(itemId);
+
+                if (tech == null)
+                {
+                    OsbLog.Info("科技样本 " + itemId + " → 无科技门槛"
+                        + (expectGated ? "（与预期不符：预期应归属某科技）" : "（符合预期：开局即解锁）")
+                        + " IsComplete=" + complete);
+                    return;
+                }
+
+                OsbLog.Info("科技样本 " + itemId + " → tech=" + tech.Id
+                    + " tier=" + tech.tier
+                    + " 已解锁=" + complete);
+            }
+            catch (Exception e)
+            {
+                OsbLog.Warn("科技样本 " + itemId + " 查询失败：" + e.GetType().Name + ": " + e.Message);
             }
         }
     }
