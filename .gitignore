@@ -1,0 +1,21 @@
+# 编译输出与缓存
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# 反编译 / 参考产物（体积大，且不得分发游戏反编译内容）
+reference/
+_ilspy/
+
+# 游戏专有程序集（严禁提交）
+Assembly-CSharp*.dll
+0Harmony.dll
+UnityEngine*.dll
+Unity.TextMeshPro.dll
+Newtonsoft.Json.dll
+
+# 系统文件
+.DS_Store
+Thumbs.db

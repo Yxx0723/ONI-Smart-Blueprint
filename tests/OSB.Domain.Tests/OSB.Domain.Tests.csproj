@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- =========================================================================
+       OSB.Domain.Tests —— 零外部依赖的测试运行器。
+       原因：本机 NuGet 源不可达（见 docs/Phase-Reports/P0-report.md 环境章节），
+       xunit / Microsoft.NET.Test.Sdk 无法还原。为保证"核心逻辑可离线验证"这一条
+       P0 验收项不被环境卡住，这里用一个 200 行的自建断言器替代测试框架。
+       它没有发现/筛选能力，但等价覆盖断言与失败定位；
+       一旦网络恢复，应迁移到正规模架（记录在 CONTEXT-HANDOFF.md）。
+       ========================================================================= -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>OSB.Domain.Tests</RootNamespace>
+    <AssemblyName>OSB.Domain.Tests</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateDependencyFile>true</GenerateDependencyFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Check.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="GeometryTests.cs" />
+    <Compile Include="BlueprintTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\OSB.Domain\OSB.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

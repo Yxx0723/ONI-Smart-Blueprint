@@ -1,0 +1,15 @@
+<Project>
+  <!-- =========================================================================
+       GameManagedDir：游戏托管程序集目录（ONI 的 Assembly-CSharp.dll 等所在处）
+       解析优先级：
+         1. 命令行      -p:GameManagedDir=...
+         2. 环境变量    ONI_GAME_MANAGED_DIR
+         3. 平台默认    Windows / macOS 的 Steam 标准安装位置
+       不得把本机绝对路径写死进提交代码 —— 通过上面三档覆盖。
+       ========================================================================= -->
+  <PropertyGroup>
+    <GameManagedDir Condition="'$(GameManagedDir)' == '' and '$(ONI_GAME_MANAGED_DIR)' != ''">$(ONI_GAME_MANAGED_DIR)</GameManagedDir>
+    <GameManagedDir Condition="'$(GameManagedDir)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">D:\SteamLibrary\steamapps\common\OxygenNotIncluded\OxygenNotIncluded_Data\Managed</GameManagedDir>
+    <GameManagedDir Condition="'$(GameManagedDir)' == '' and $([MSBuild]::IsOSPlatform('OSX'))">$([System.Environment]::GetFolderPath(SpecialFolder.UserProfile))/Library/Application Support/Steam/steamapps/common/OxygenNotIncluded/OxygenNotIncluded.app/Contents/Resources/Data/Managed</GameManagedDir>
+  </PropertyGroup>
+</Project>

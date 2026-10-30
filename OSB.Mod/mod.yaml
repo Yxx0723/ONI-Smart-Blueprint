@@ -1,0 +1,8 @@
+# mod.yaml —— 游戏内 Mod 列表显示信息
+# 注意：version / minimumSupportedBuild / APIVersion 属于 mod_info.yaml，不要写在这里。
+
+title: "ONI Smart Blueprint"
+description: "【ONI 智能蓝图 OSB】参数化模块生成与原生育儿的蓝图规划工具（开发中，当前为 P0 技术验证骨架）。\n\n本 MOD 当前版本只执行只读诊断：把游戏版本、建筑定义几何特征和关键 API 签名写入日志，用于验证技术可行性。不会创建建筑、不会修改存档、不会改变游戏行为。"
+
+# 稳定标识符，作为 Harmony ID 基础；发布后不要改
+staticID: "ONISmartBlueprint"

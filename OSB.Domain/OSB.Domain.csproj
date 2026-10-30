@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- =========================================================================
+       OSB.Domain —— 纯 C# 领域层。
+       硬约束：本项目禁止引用 Assembly-CSharp / UnityEngine / Harmony。
+       只有保持这一点，核心规则才能在无游戏环境、无 Unity 的机器上离线单测。
+       ========================================================================= -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RootNamespace>OSB.Domain</RootNamespace>
+    <AssemblyName>OSB.Domain</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Point2i.cs" />
+    <Compile Include="Rect2i.cs" />
+    <Compile Include="Footprint.cs" />
+    <Compile Include="LayerKind.cs" />
+    <Compile Include="BuildingRecord.cs" />
+    <Compile Include="Blueprint.cs" />
+  </ItemGroup>
+
+</Project>

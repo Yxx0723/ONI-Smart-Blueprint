@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- =========================================================================
+       OSB.Mod —— MOD 入口程序集。
+       Debug 构建直接输出到游戏 Dev mod 目录，编译完即可在游戏内看到；
+       Release 构建输出到 bin/Release 供打包。
+       输出目录解析优先级：
+         1. -p:DevModDir=...
+         2. 环境变量 ONI_DEV_MOD_DIR
+         3. 各平台默认 Dev 目录
+       ========================================================================= -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RootNamespace>OSB.Mod</RootNamespace>
+    <AssemblyName>OSB.Mod</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- 手写 Properties\AssemblyInfo.cs，关闭自动生成以免 CS0579 重复特性 -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+
+    <DevModDir Condition="'$(DevModDir)' == '' and '$(ONI_DEV_MOD_DIR)' != ''">$(ONI_DEV_MOD_DIR)</DevModDir>
+    <DevModDir Condition="'$(DevModDir)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">$(USERPROFILE)\Documents\Klei\OxygenNotIncluded\mods\Dev\ONISmartBlueprint</DevModDir>
+    <DevModDir Condition="'$(DevModDir)' == '' and $([MSBuild]::IsOSPlatform('OSX'))">$([System.Environment]::GetFolderPath(SpecialFolder.UserProfile))/Library/Application Support/unity.Klei.Oxygen Not Included/mods/Dev/ONISmartBlueprint</DevModDir>
+    <DevModDir Condition="'$(DevModDir)' == ''">bin/Debug/</DevModDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <OutputPath>$(DevModDir)</OutputPath>
+    <OutDir>$(OutputPath)</OutDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <OutputPath>bin/Release/</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="OsbMod.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+
+  <!-- Mod 描述文件必须与 DLL 同目录 -->
+  <ItemGroup>
+    <None Include="mod.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="mod_info.yaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OSB.GameAdapter\OSB.GameAdapter.csproj" />
+    <ProjectReference Include="..\OSB.Domain\OSB.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(GameManagedDir)/Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GameManagedDir)/0Harmony.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(GameManagedDir)/UnityEngine.CoreModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

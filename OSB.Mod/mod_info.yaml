@@ -1,0 +1,13 @@
+# mod_info.yaml —— Mod 加载与兼容性信息
+# 字段名与语义已对照 KMod.Mod.PackagedModInfo 核实（见 docs/API-Audit.md A-002）。
+
+supportedContent: ALL
+
+# 本 MOD 实际验证过的最低游戏 Build 号。
+# 本机实测游戏构建为 U59-744825-S (release)，故取 744825。
+minimumSupportedBuild: 744825
+
+version: 0.0.1
+
+# 2021 年后必须为 2（KMod.Mod.MOD_API_VERSION = 2）
+APIVersion: 2

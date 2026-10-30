@@ -1,0 +1,6 @@
+<Project>
+  <Project Path="OSB.Domain/OSB.Domain.csproj" />
+  <Project Path="OSB.GameAdapter/OSB.GameAdapter.csproj" />
+  <Project Path="OSB.Mod/OSB.Mod.csproj" />
+  <Project Path="tests/OSB.Domain.Tests/OSB.Domain.Tests.csproj" />
+</Project>
